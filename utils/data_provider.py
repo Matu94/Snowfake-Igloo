@@ -2,6 +2,9 @@
 import streamlit as st
 
 class MockDataProvider:
+    def get_schemas(self):
+        return["BRONZE", "SILVER", "GOLD"]
+
     def get_tables(self, schema_name):
         """Returns a fake list of tables for testing UI"""
         if "BRONZE" in schema_name:
