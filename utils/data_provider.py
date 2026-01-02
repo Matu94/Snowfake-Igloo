@@ -1,12 +1,15 @@
 # utils/data_provider.py
 import streamlit as st
+import pandas as pd
+from utils.snowflake_connector import get_session
+
 
 class MockDataProvider:
     def get_schemas(self):
         return["BRONZE", "SILVER", "GOLD"]
 
     def get_tables(self, schema_name):
-        """Returns a fake list of tables for testing UI"""
+        #Returns a fake list of tables for testing UI
         if "BRONZE" in schema_name:
             return ["LANDING_USERS", "LANDING_ORDERS", "RAW_LOGS"]
         elif "SILVER" in schema_name:
@@ -15,7 +18,7 @@ class MockDataProvider:
             return ["UNKNOWN_TABLE"]
 
     def get_columns(self, table_name):
-        """Returns fake columns based on table name"""
+        #Returns fake columns based on table name
         if "USERS" in table_name:
             return [("ID", "NUMBER"), ("NAME", "VARCHAR"), ("CREATED_AT", "TIMESTAMP")]
         elif "ORDERS" in table_name:
@@ -23,7 +26,25 @@ class MockDataProvider:
         else:
             return [("COL_1", "VARCHAR"), ("COL_2", "NUMBER")]
 
+
+class RealDataProvider:
+    def __init__(self):
+        self.session = get_session()
+
+    def get_schemas(self, db_name):
+        df = self.session.sql(f"SHOW SCHEMAS IN DATABASE {db_name}").collect()
+        schemas = [
+                row["name"] 
+                for row in df 
+                if row["name"] not in ["INFORMATION_SCHEMA", "PUBLIC"] #Optional filtering
+            ]
+        return schemas
+
+        
+
+
 # Factory function to get the provider
 def get_data_provider():
     #if local -> use Mock, if Server -> use Real
-    return MockDataProvider()
+    return RealDataProvider()
+    #return MockDataProvider()

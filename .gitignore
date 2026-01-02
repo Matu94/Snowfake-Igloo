@@ -18,6 +18,7 @@ dist/
 
 # Streamlit
 .streamlit/secrets.toml
+.streamlit/rsa_key.p8
 
 # sandbox
 sandbox
