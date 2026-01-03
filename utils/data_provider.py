@@ -31,6 +31,7 @@ class RealDataProvider:
     def __init__(self):
         self.session = get_session()
 
+    #Get schemas in the current db
     def get_schemas(self, db_name):
         df = self.session.sql(f"SHOW SCHEMAS IN DATABASE {db_name}").collect()
         schemas = [
@@ -40,8 +41,26 @@ class RealDataProvider:
             ]
         return schemas
 
-        
+    #Get tables in a specific schema
+    def get_tables(self, schema_name):
+        df = self.session.sql(f"SHOW TABLES IN SCHEMA {schema_name}").collect()
+        tables = [row["name"] for row in df]
+        return tables
+    
+    #Get views in a specific schema
+    def get_views(self, schema_name):
+        df = self.session.sql(f"SHOW VIEWS IN SCHEMA {schema_name}").collect()
+        views = [row["name"] for row in df]
+        return views
 
+    #Get columns in a specific table/view 
+    def get_columns(self, schema_name, table_name, obj_type):
+        if obj_type == 'Table':
+            df = self.session.sql(f"DESCRIBE TABLE {schema_name}.{table_name}").collect()
+        elif obj_type == 'View':
+            df = self.session.sql(f"DESCRIBE VIEW {schema_name}.{table_name}").collect()
+        columns = [(row["name"], row["type"]) for row in df]
+        return columns
 
 # Factory function to get the provider
 def get_data_provider():
