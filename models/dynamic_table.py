@@ -3,9 +3,9 @@ from models.base import DatabaseObject
 
 class DynamicTable(DatabaseObject):
 
-    def __init__(self, name, schema, columns, source_object, warehouse, target_lag):
+    def __init__(self, schema, name, columns, source_object, warehouse, target_lag):
         # super(): pass the standard stuff to the Parent (base.py - DatabaseObject)
-        super().__init__(name, schema, columns)
+        super().__init__(schema, name, columns)
         
         # Save the new specific stuff to self
         self.sourceobject = source_object
