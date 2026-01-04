@@ -42,114 +42,135 @@ if page == "Home":
 elif page == "Create New Object":
 
     st.header("🆕 Create Object from Scratch")
-    #st.caption("Define your object structure manually by adding columns.")
+    st.caption("Define your object structure manually by adding columns.")
 
-    #provider = get_data_provider()
+    provider = get_data_provider()
 
-    ## 1. Object Settings
-    #with st.container():
-    #    col1, col2, col3 = st.columns(3)
-    #    with col1:
-    #        obj_type = st.selectbox("Select the new object type:", ["Table", "Dynamic Table", "View"])
-    #        target_schema = st.selectbox("Target Schema", provider.get_schemas())
-    #    with col2:
-    #        target_name = st.text_input("Object Name", placeholder="e.g. USERS_RAW")
-    #        if obj_type in ("Dynamic Table", "View"):
-    #            editor_source_object = st.selectbox("Select source object:", provider.get_tables(target_schema))
-    #    with col3:
-    #        if obj_type == "Dynamic Table":
-    #            target_lag = st.text_input("Target lag:", placeholder="e.g. 10 min")
-    #            warehouse = st.text_input("Warehouse:", placeholder="e.g. WH_ADHOC")
+    ##########################################################  1. Object Settings  ########################################################## 
+    with st.container():
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            obj_type = st.selectbox("Select the new object type:", ["Table", "Dynamic Table", "View"])
+            target_schema = st.selectbox("Target Schema", provider.get_schemas(database))
+            target_name = st.text_input("Object Name", placeholder="e.g. USERS_RAW")
+        with col2:
+            if obj_type in ("Dynamic Table", "View"):
+                editor_source_schema = st.selectbox("Select source schema:", provider.get_schemas(database))
+                editor_source_table = st.selectbox("Select source object:", provider.get_tables(editor_source_schema))
+        with col3:
+            if obj_type == "Dynamic Table":
+                target_lag = st.text_input("Target lag:", placeholder="e.g. 10 min")
+                warehouse = st.text_input("Warehouse:", placeholder="e.g. WH_ADHOC")
 
-    #st.divider()
-
-    ## 2. Column Definition Editor
-    #st.subheader("Define Columns")
-   # 
-    #default_data = pd.DataFrame(
-    #    [{"Column Name": "ID", "Transformation Rule": "", "Data Type": "NUMBER", "Nullable": True}],
-    #)
-    ## Default structure for the editor - if view or dt, set the source columns with types
-    #if obj_type in ("Dynamic Table", "View"):
-    #    for i in range(2):
-    #        default_data = default_data.add(pd.DataFrame( 
-    #            [{"Column Name": provider.get_columns(editor_source_object)[i][0], 
-    #              "Transformation Rule": "", 
-    #              "Data Type": provider.get_columns(editor_source_object)[i][1], 
-    #              "Nullable": True}])
-    #             #{"Column Name": provider.get_columns(editor_source_object)[2][0], 
-    #             #"Transformation Rule": "", 
-    #             #"Data Type": provider.get_columns(editor_source_object)[2][1], 
-    #             #"Nullable": True}]
-
-    #    )
-    #else:
-    #    default_data = pd.DataFrame(
-    #        [{"Column Name": "ID", "Transformation Rule": "", "Data Type": "NUMBER", "Nullable": True}],
-    #    )
-   # 
-
-    ## Types available in Snowflake
-    #sf_types = ["NUMBER", "VARCHAR", "BOOLEAN", "TIMESTAMP", "DATE", "VARIANT", "FLOAT"]
-
-    ## The Editor allows adding/deleting rows (num_rows="dynamic")
-    #editor_result = st.data_editor(
-    #    default_data,
-    #    num_rows="dynamic", 
-    #    column_config={
-    #        "Column Name": st.column_config.TextColumn("Column Name", required=True),
-    #        "Transformation Rule": st.column_config.TextColumn("Transformation Logic (SQL)", help="e.g. UPPER(col) or CAST(col as int)"),
-    #        "Data Type": st.column_config.SelectboxColumn("Data Type", options=sf_types, required=True),
-    #        "Nullable": st.column_config.CheckboxColumn("Allow Nulls?"),
-    #    },
-    #    use_container_width=True,
-    #    key="create_editor"
-    #)
-
-    ##Based on editor, create the syntax ready DDL
-    #col_definitions = []
-    #for index, row in editor_result.iterrows():
-    #    if row["Column Name"]: # Skip empty rows
-    #        # Logic: NAME TYPE [NOT NULL]
-    #        rule = f"{row['Transformation Rule']} AS {row['Column Name']}" if row['Transformation Rule'] else row['Column Name']
-    #        col_str = f"{rule} {row['Data Type']}"
-    #        if not row["Nullable"]:
-    #            col_str += " NOT NULL"
-    #        col_definitions.append(col_str)
-   # 
-    ## Join them
-    #cols_sql = ",\n".join(col_definitions)
-
-    ##Generate DDL based on editor_result
-    ##3 Object display
-    #if obj_type == 'View':
-
-    #    result = View(
-    #        schema = target_schema, 
-    #        name = target_name, 
-    #        columns=cols_sql,
-    #        source_object = editor_source_object)
-
-    #    st.code(result.create_ddl(), language='sql')
-
-    #if obj_type == 'Table':
-
-    #    result = Table(
-    #        schema = target_schema, 
-    #        name = target_name, 
-    #        columns=cols_sql)
-
-    #    st.code(result.create_ddl(), language='sql')
+    st.divider()
 
 
-    #if obj_type == 'Dynamic Table':
-    #
-    #    result = DynamicTable(
-    #        schema = target_schema, 
-    #        name = target_name, 
-    #        columns=cols_sql)
-    #
-    #    st.code(result.create_ddl(), language='sql')
+
+    ##########################################################  2. Column Definition Editor ########################################################## 
+    #need this because i gave the coice to select the base types, but already existing can have more precies ones like NUMBER(38,0)
+    st.subheader("Define Columns")
+
+    #Base Types 
+    sf_types = ["NUMBER", "VARCHAR", "BOOLEAN", "TIMESTAMP", "DATE", "VARIANT", "FLOAT"]
+    
+    #Prepare Data & Dynamic Options for existing datatypes from get_columns()
+    rows_list = []
+    
+    #For DT and View:
+    if obj_type in ("Dynamic Table", "View"):
+        #Fetch ALL columns at once
+        source_cols = provider.get_columns(editor_source_schema, editor_source_table, obj_type)
+        
+        #Build the rows from source 
+        #rows_list is a list, and the result of get_columns is also a list with 2 stuffs in it. first is the column name, second is the type. So with this for loop i can build the required list
+        for col_name, col_type in source_cols:
+            rows_list.append({
+                "Column Name": col_name,
+                "Transformation Rule": "",
+                "Data Type": col_type, #This can be 'NUMBER(38,0)', wich is not part of the base types
+                "Nullable": True
+            })
+            
+            #Add this specific/more precise type to list if it's not there
+            if col_type not in sf_types:
+                sf_types.append(col_type)
+    else:
+        #Default empty row for "Create from Scratch"
+        rows_list.append({"Column Name": "", "Transformation Rule": "", "Data Type": "", "Nullable": True})
+
+
+    # Create the DataFrame
+    default_data = pd.DataFrame(rows_list)
+
+
+
+    ##########################################################   3. Create the Editor   ########################################################## 
+    #Now 'options' includes both standard types and the specific ones fromsource
+    editor_result = st.data_editor(
+        default_data,
+        num_rows="dynamic",
+        column_config={
+            "Column Name": st.column_config.TextColumn("Column Name", required=True),
+            "Transformation Rule": st.column_config.TextColumn("Transformation Logic (SQL)", help="e.g. UPPER(col)"),
+            "Data Type": st.column_config.SelectboxColumn(
+                "Data Type", 
+                options=sorted(list(set(sf_types))), #set removes duplicates, list converts it back to liust, sorted ofc sort it...
+                required=True #This tells the data editor that this specific cell cannot be empty
+            ),
+            "Nullable": st.column_config.CheckboxColumn("Allow Nulls?", default = True),
+        },
+        use_container_width=True,
+        key="create_editor"
+    )
+
+    ##########################################################  4. Generate DDL   ########################################################## 
+    col_definitions = []
+    col_names_only = [] #For view DDL
+    for index, row in editor_result.iterrows():
+        if row["Column Name"]: 
+            rule = f"{row['Transformation Rule']} AS {row['Column Name']}" if row['Transformation Rule'] else row['Column Name']
+            
+            #This will now use whatever is in the cell, e.g. "NUMBER(38,0)"
+            col_str = f"{rule} {row['Data Type']}"
+            
+            if not row["Nullable"]:
+                col_str += " NOT NULL"
+            col_definitions.append(col_str)
+
+            col_names_only.append(row["Column Name"])
+
+    cols_sql = ",\n\t".join(col_definitions)          #Result: "ID NUMBER, NAME VARCHAR"
+    cols_names_str = ",\n\t".join(col_names_only)      #Result: "ID, NAME"
+
+
+
+    ########################################################## 5. Object display    ##########################################################
+    if obj_type == 'Table':
+        result = Table(
+            schema = target_schema, 
+            name = target_name, 
+            columns=cols_sql)
+        st.code(result.create_ddl(), language='sql')
+
+    if obj_type == 'View':
+        result = View(
+            schema = target_schema, 
+            name = target_name, 
+            columns=cols_names_str,
+            col_names=cols_names_str,
+            source_object = f"{editor_source_schema}.{editor_source_table}")
+        st.code(result.create_ddl(), language='sql')
+
+    if obj_type == 'Dynamic Table':
+        result = DynamicTable(
+            schema = target_schema, 
+            name = target_name, 
+            columns=cols_names_str,
+            source_object=f"{editor_source_schema}.{editor_source_table}",
+            warehouse=warehouse,
+            target_lag=target_lag
+        )
+        st.code(result.create_ddl(), language='sql')
 
 
 
@@ -175,3 +196,10 @@ elif page == "Sandbox":
     st.code(provider.get_views('STAGING'))
     st.code(provider.get_columns('STAGING','ORDERS_STG','Table'))
     st.code(provider.get_columns('STAGING','V_ORDERS_CLEAN','View'))
+    st.warning("Select a valid object type!")
+
+
+    test = [('ORDER_ID', 'NUMBER(38,0)'), ('USER_ID', 'NUMBER(38,0)'), ('AMOUNT', 'NUMBER(10,2)')]
+    for col_name, col_type in test:
+        st.info(col_name)
+        st.info(col_type)

@@ -3,9 +3,9 @@ import streamlit as st
 import pandas as pd
 from utils.snowflake_connector import get_session
 
-
+#Get some sample data for offline dev
 class MockDataProvider:
-    def get_schemas(self):
+    def get_schemas(self, db_name):
         return["BRONZE", "SILVER", "GOLD"]
 
     def get_tables(self, schema_name):
@@ -17,7 +17,7 @@ class MockDataProvider:
         else:
             return ["UNKNOWN_TABLE"]
 
-    def get_columns(self, table_name):
+    def get_columns(self, schema_name, table_name, obj_type):
         #Returns fake columns based on table name
         if "USERS" in table_name:
             return [("ID", "NUMBER"), ("NAME", "VARCHAR"), ("CREATED_AT", "TIMESTAMP")]
@@ -27,6 +27,7 @@ class MockDataProvider:
             return [("COL_1", "VARCHAR"), ("COL_2", "NUMBER")]
 
 
+#returns real data from snowflake
 class RealDataProvider:
     def __init__(self):
         self.session = get_session()
@@ -55,7 +56,7 @@ class RealDataProvider:
 
     #Get columns in a specific table/view 
     def get_columns(self, schema_name, table_name, obj_type):
-        if obj_type == 'Table':
+        if obj_type in ('Table','Dynamic Table'):
             df = self.session.sql(f"DESCRIBE TABLE {schema_name}.{table_name}").collect()
         elif obj_type == 'View':
             df = self.session.sql(f"DESCRIBE VIEW {schema_name}.{table_name}").collect()
