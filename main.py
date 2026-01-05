@@ -7,6 +7,7 @@ from models.view import View
 from models.dynamic_table import DynamicTable
 from components.table_editor import create_table
 from components.view_editor import create_view
+from components.dynamictable_editor import create_dynamic_table
 
 
 #   !!!!!!!!    Page Config     !!!!!!!!
@@ -67,3 +68,5 @@ elif page == "Create New Object":
 
     if obj_type == 'View':
         st.code(create_view(editor_source_schema,editor_source_table,target_schema,target_name), language='sql')
+    if obj_type == 'Dynamic Table':
+        st.code(create_dynamic_table(editor_source_schema,editor_source_table,target_schema,target_name,warehouse,target_lag), language='sql')
