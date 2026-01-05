@@ -6,6 +6,7 @@ from models.table import Table
 from models.view import View
 from models.dynamic_table import DynamicTable
 from components.table_editor import create_table
+from components.view_editor import create_view
 
 
 #   !!!!!!!!    Page Config     !!!!!!!!
@@ -17,7 +18,7 @@ page = st.sidebar.radio("Go to", ["Home", "Create New Object", "Modify Existing"
 
 session = get_session()
 database = session.get_current_database()
-
+provider = get_data_provider()
 
 
 # ==========================================
@@ -45,7 +46,6 @@ elif page == "Create New Object":
     st.header("🆕 Create Object from Scratch")
     st.caption("Define your object structure manually by adding columns.")
 
-    provider = get_data_provider()
 
     ##########################################################  1. Object Settings  ########################################################## 
     with st.container():
@@ -164,6 +164,7 @@ elif page == "Create New Object":
             col_names=cols_names_str,
             source_object = f"{editor_source_schema}.{editor_source_table}")
         st.code(result.create_ddl(), language='sql')
+        
 
     if obj_type == 'Dynamic Table':
         result = DynamicTable(
@@ -176,7 +177,8 @@ elif page == "Create New Object":
         )
         st.code(result.create_ddl(), language='sql')
 
-
+    st.write("view")
+    
 
 
 # ==========================================

@@ -26,7 +26,7 @@ def create_table(target_schema,target_name):
             "Nullable": st.column_config.CheckboxColumn("Allow Nulls?", default = True),
         },
         use_container_width=True,
-        key="create_editor"
+        key="table_create_editor" #unique ID badge for this 'widget' 
     )
 
     #2. Create the DDL
