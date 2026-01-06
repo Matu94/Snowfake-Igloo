@@ -24,10 +24,10 @@ def create_view(editor_source_schema,editor_source_table,target_schema,target_na
     #rows_list is a list, and the result of get_columns is also a list with 2 stuffs in it. first is the column name, second is the type. So with this for loop i can build the required list
     for col_name, col_type in source_cols:
         rows_list.append({
-            "Source Column": col_name,
-            "Target Column": col_name,
+            "Source_Column_Name": col_name,
+            "New_Column_Name": col_name,
             "Transformation": "",
-            "Data Type": col_type #This can be 'NUMBER(38,0)', wich is not part of the base types
+            "Data_Type": col_type #This can be 'NUMBER(38,0)', wich is not part of the base types
         })
 
         #Add this specific/more precise type to list if it's not there
@@ -45,10 +45,10 @@ def create_view(editor_source_schema,editor_source_table,target_schema,target_na
         default_data,
         num_rows="dynamic",
         column_config={
-            "Source Column": st.column_config.TextColumn("Source Column", required=True),
-            "Target Column": st.column_config.TextColumn("Target Column", required=True),
-            "Transformation": st.column_config.TextColumn("Target Column"),
-            "Data Type": st.column_config.SelectboxColumn(
+            "Source_Column_Name": st.column_config.TextColumn("Source Column", required=True),
+            "New_Column_Name": st.column_config.TextColumn("New Column Name", required=True),
+            "Transformation": st.column_config.TextColumn("Transformation", help = "eg. 'LEFT()'"),
+            "Data_Type": st.column_config.SelectboxColumn(
                 "Data Type", 
                 options=sorted(list(set(sf_types))), #set removes duplicates, list converts it back to liust, sorted ofc sort it...
                 required=True #This tells the data editor that this specific cell cannot be empty
@@ -62,13 +62,18 @@ def create_view(editor_source_schema,editor_source_table,target_schema,target_na
     #4. Generate DDL   
     col_definitions = []
     col_names_only = [] #For view DDL
-    for index, row in editor_result.iterrows(): #need index to have string as a result, not tuple
-        if row["Source Column"]: 
-            #This will now use whatever is in the cell, e.g. "NUMBER(38,0)"
-            col_str = f"{row['Source Column']}::{row['Data Type']}"
 
+    for index, row in editor_result.iterrows(): #need index to have string as a result, not tuple
+        if row["Source_Column_Name"]: 
+            
+            rule = row['Transformation'] if row['Transformation'] else row['Source_Column_Name']    #Check that we have rule or not. if not, use the original column name
+
+            if rule != row["New_Column_Name"]:  #If we have rule that means we need to build the string in a different way, we need alias anyways with this method
+                col_str = f"{rule}::{row['Data_Type']} AS {row['New_Column_Name']}"
+            else:
+                col_str = f"{row['Source_Column_Name']}::{row['Data_Type']}"
             col_definitions.append(col_str) 
-            col_names_only.append(row["Source Column"])   
+            col_names_only.append(row["New_Column_Name"])   
     cols_sql = ",\n\t".join(col_definitions)          #Result: "ID NUMBER, NAME VARCHAR"
     cols_names_str = ",\n\t".join(col_names_only)      #Result: "ID, NAME"  
 
