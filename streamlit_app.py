@@ -6,11 +6,12 @@ from components.table_editor import create_table
 from components.view_editor import create_view
 from components.dynamictable_editor import create_dynamic_table
 from components.deploy_ui import display_deploy_button
+from components.home import home
 
 
 #   !!!!!!!!    Page Config     !!!!!!!!
-st.set_page_config(page_title="Snowflake Builder", layout="wide")
-st.title("❄️ Snowflake Object Builder")
+st.set_page_config(page_title="Igloo", layout="wide")
+st.title("❄️Igloo - Snowflake Object Management Tool")
 
 st.sidebar.title("Menu")
 page = st.sidebar.radio("Go to", ["Home", "Create New Object", "Modify Existing", "Sandbox"])
@@ -24,16 +25,7 @@ provider = get_data_provider()
 # PAGE 1: HOME (Dashboard)
 # ==========================================
 if page == "Home":
-    st.write("### Welcome to the ETL Builder")
-    
-    # Connection Check
-    session = get_session()
-    if session:
-        st.success(f"Connected to Snowflake! Current Role: {session.get_current_role()}")
-        st.info(f"Current Warehouse: {session.get_current_warehouse()}, Current Database: {session.get_current_database()}")
-        database = session.get_current_database()
-    else:
-        st.warning("No active Snowflake session found.")
+    home()
 
 
 
