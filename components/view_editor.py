@@ -12,7 +12,7 @@ provider = get_data_provider()
 
 
 
-##########################################################  1. Create View ########################################################## 
+
 def create_view(editor_source_schema,editor_source_table,target_schema,target_name):
     
     #1. Create dynamic col_type options (both standard and already existing)
@@ -24,10 +24,10 @@ def create_view(editor_source_schema,editor_source_table,target_schema,target_na
     #rows_list is a list, and the result of get_columns is also a list with 2 stuffs in it. first is the column name, second is the type. So with this for loop i can build the required list
     for col_name, col_type in source_cols:
         rows_list.append({
-            "Source_Column_Name": col_name,
-            "New_Column_Name": col_name,
-            "Transformation": "",
-            "Data_Type": col_type #This can be 'NUMBER(38,0)', wich is not part of the base types
+            "src_col_nm": col_name,
+            "new_col_nm": col_name,
+            "transformation": "",
+            "data_type": col_type #This can be 'NUMBER(38,0)', wich is not part of the base types
         })
 
         #Add this specific/more precise type to list if it's not there
@@ -45,10 +45,10 @@ def create_view(editor_source_schema,editor_source_table,target_schema,target_na
         default_data,
         num_rows="dynamic",
         column_config={
-            "Source_Column_Name": st.column_config.TextColumn("Source Column", required=True),
-            "New_Column_Name": st.column_config.TextColumn("New Column Name", required=True),
-            "Transformation": st.column_config.TextColumn("Transformation", help = "eg. 'LEFT()'"),
-            "Data_Type": st.column_config.SelectboxColumn(
+            "src_col_nm": st.column_config.TextColumn("Source Column", required=True),
+            "new_col_nm": st.column_config.TextColumn("New Column Name", required=True),
+            "transformation": st.column_config.TextColumn("Transformation", help = "eg. 'LEFT()'"),
+            "data_type": st.column_config.SelectboxColumn(
                 "Data Type", 
                 options=sorted(list(set(sf_types))), #set removes duplicates, list converts it back to liust, sorted ofc sort it...
                 required=True #This tells the data editor that this specific cell cannot be empty
@@ -64,16 +64,16 @@ def create_view(editor_source_schema,editor_source_table,target_schema,target_na
     col_names_only = [] #For view DDL
 
     for index, row in editor_result.iterrows(): #need index to have string as a result, not tuple
-        if row["Source_Column_Name"]: 
+        if row["src_col_nm"]: 
             
-            rule = row['Transformation'] if row['Transformation'] else row['Source_Column_Name']    #Check that we have rule or not. if not, use the original column name
+            rule = row['transformation'] if row['transformation'] else row['src_col_nm']    #Check that we have rule or not. if not, use the original column name
 
-            if rule != row["New_Column_Name"]:  #If we have rule that means we need to build the string in a different way, we need alias anyways with this method
-                col_str = f"{rule}::{row['Data_Type']} AS {row['New_Column_Name']}"
+            if rule != row["new_col_nm"]:  #If we have rule that means we need to build the string in a different way, we need alias anyways with this method
+                col_str = f"{rule}::{row['data_type']} AS {row['new_col_nm']}"
             else:
-                col_str = f"{row['Source_Column_Name']}::{row['Data_Type']}"
+                col_str = f"{row['src_col_nm']}::{row['data_type']}"
             col_definitions.append(col_str) 
-            col_names_only.append(row["New_Column_Name"])   
+            col_names_only.append(row["new_col_nm"])   
     cols_sql = ",\n\t".join(col_definitions)          #Result: "ID NUMBER, NAME VARCHAR"
     cols_names_str = ",\n\t".join(col_names_only)      #Result: "ID, NAME"  
 
