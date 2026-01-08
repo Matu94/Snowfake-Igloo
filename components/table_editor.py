@@ -49,3 +49,7 @@ def create_table(target_schema,target_name):
 
 
     return result.create_ddl()
+
+
+
+def modify_table(target_schema,target_name):

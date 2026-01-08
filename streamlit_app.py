@@ -3,6 +3,7 @@ import pandas as pd
 from utils.snowflake_connector import get_session
 from utils.data_provider import get_data_provider
 from components.builders_ui import create_object
+from components.builders_ui import modify_object
 from components.home_ui import home
 
 
@@ -37,8 +38,8 @@ elif page == "Create New Object":
 # PAGE 3: MODIFY EXISTING 
 # ==========================================
 elif page == "Modify Existing":
-    st.header("Modif existing")
-    #provider = get_data_provider()
+    modify_object()
+
 
     
 # ==========================================

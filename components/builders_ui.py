@@ -93,5 +93,23 @@ def create_object():
 
 
 
+
 def modify_object():
+    st.markdown("### Modify an existing object")
+    st.markdown("Configure your Snowflake object below.")
+
+    #TARGET CONFIGURATION
+    with st.container(border=True):
+        st.markdown("#### 1. Target Definition")
+        
+        c1, c2, c3 = st.columns([1, 1, 2]) #Uneven columns for better spacing
+        
+        with c1:
+            obj_type = st.selectbox("Object Type", ["Table", "View", "Dynamic Table"])
+        
+        with c2:
+            selected_schema = st.selectbox("Select Schema", provider.get_schemas(database))
+        
+        with c3:
+            selected_object_name = st.text_input("Select Name")
     return None
