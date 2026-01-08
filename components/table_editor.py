@@ -52,4 +52,12 @@ def create_table(target_schema,target_name):
 
 
 
-def modify_table(target_schema,target_name):
+def modify_table(selected_schema,selected_object_name):
+
+
+
+    #3. Display the DDL
+    result = Table(
+        schema = selected_schema, 
+        name = selected_object_name, 
+        columns=cols_sql)

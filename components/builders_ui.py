@@ -111,5 +111,8 @@ def modify_object():
             selected_schema = st.selectbox("Select Schema", provider.get_schemas(database))
         
         with c3:
-            selected_object_name = st.text_input("Select Name")
+            if obj_type == "View":
+                object_name = st.selectbox("Select Object", provider.get_views(selected_schema))
+            elif obj_type in ("Table", "Dynamic Table"):
+                object_name = st.selectbox("Select Object", provider.get_tables(selected_schema))
     return None
