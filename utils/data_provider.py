@@ -42,21 +42,25 @@ class RealDataProvider:
             ]
         return schemas
 
-    #Get tables in a specific schema
-    def get_tables(self, schema_name, type):
-        df_all = self.session.sql(f"SHOW TABLES IN SCHEMA {schema_name}").collect()
-        df_dt = self.session.sql(f"SHOW DYNAMIC TABLES IN SCHEMA {schema_name}").collect()
-        tables_all = [row["name"] for row in (df_all)]
-        tables_dt = [row["name"] for row in (df_dt)]
+    #Get tables in a specific schema, default is all so don't need to specify in some cases
+    def get_tables(self, schema_name, type='all'):
+        #1 collect all data
         #maybe use UPPER() later, if someone was stupid enough to name the table with lowercase 
-        tables_normal = list(set(tables_all) - set(tables_dt))  #Have to use "sets" bc cant substract 1list rom another. INVALID:[1, 2, 3] - [2], VALID:{1, 2, 3} - {2}
+        df_all = self.session.sql(f"SHOW TABLES IN SCHEMA {schema_name}").collect()
+        tables_all = [row["name"] for row in (df_all)]
+        if type == 'all':
+            return tables_all
+
+        #2 collect dt data
+        df_dt = self.session.sql(f"SHOW DYNAMIC TABLES IN SCHEMA {schema_name}").collect()
+        tables_dt = [row["name"] for row in (df_dt)]
         
+        #handle dt/normal
         if type == 'normal':
-            return tables_normal
+            return list(set(tables_all) - set(tables_dt))  #Have to use "sets" bc cant substract 1list rom another. INVALID:[1, 2, 3] - [2], VALID:{1, 2, 3} - {2}  
         elif type == 'dynamic':
             return tables_dt
-        elif type == 'all':
-            return tables_all
+
     
     #Get views in a specific schema
     def get_views(self, schema_name):
