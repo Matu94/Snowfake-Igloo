@@ -49,9 +49,8 @@ elif page == "Sandbox":
     st.header("Sandbox")
     st.write("This section is my playground")
 
-    selected_schema = st.selectbox("Select Schema", provider.get_schemas(database))
-    st.code(provider.get_tables(selected_schema,'normal'))
-    st.code(provider.get_tables(selected_schema,'dynamic'))
-    st.code(provider.get_tables(selected_schema,'all'))
+
+    st.code(provider.get_transform('ANALYTICS','NEWVIEW','View'))
+    
 
 

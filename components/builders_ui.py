@@ -4,6 +4,7 @@ from utils.snowflake_connector import get_session
 from utils.data_provider import get_data_provider
 from components.table_editor import create_table
 from components.view_editor import create_view
+from components.view_editor import modify_view
 from components.dynamictable_editor import create_dynamic_table
 from components.deploy_ui import display_deploy_button
 from components.table_editor import modify_table
@@ -129,6 +130,10 @@ def modify_object():
     if obj_type == 'Table':
         
         final_ddl = modify_table(selected_schema, object_name)
+
+    if obj_type == 'View':
+        
+        final_ddl = modify_view(selected_schema, object_name)
 
     
 

@@ -21,7 +21,7 @@ def create_dynamic_table(editor_source_schema,editor_source_table,target_schema,
     source_cols = provider.get_columns(editor_source_schema, editor_source_table, 'Dynamic Table')
     #Build the rows from source 
     #rows_list is a list, and the result of get_columns is also a list with 2 stuffs in it. first is the column name, second is the type. So with this for loop i can build the required list
-    for col_name, col_type in source_cols:
+    for col_name, col_type, nullable in source_cols:
         rows_list.append({
             "src_col_nm": col_name,
             "new_col_nm": col_name,

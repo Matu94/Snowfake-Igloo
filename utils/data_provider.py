@@ -69,13 +69,77 @@ class RealDataProvider:
         return views
 
     #Get columns in a specific table/view 
-    def get_columns(self, schema_name, table_name, obj_type):
+    def get_columns(self, schema_name, obj_name, obj_type):
         if obj_type in ('Table','Dynamic Table'):
-            df = self.session.sql(f"DESCRIBE TABLE {schema_name}.{table_name}").collect()
+            df = self.session.sql(f"DESCRIBE TABLE {schema_name}.{obj_name}").collect()
         elif obj_type == 'View':
-            df = self.session.sql(f"DESCRIBE VIEW {schema_name}.{table_name}").collect()
+            df = self.session.sql(f"DESCRIBE VIEW {schema_name}.{obj_name}").collect()
         columns = [(row["name"], row["type"], row["null?"]) for row in df]
         return columns
+    
+    #simple DESC command not enough to get the transforms like LEFT(ID,2)
+    def get_transform(self, schema_name, obj_name, obj_type):
+        if obj_type == 'View':
+            df = self.session.sql(f"SELECT GET_DDL('VIEW', '{schema_name}.{obj_name}')").collect()
+            ddl = df[0][0]  # Extract the DDL string
+
+            #Find the SELECT statement part
+            select_start = ddl.upper().find('SELECT')
+            from_start = ddl.upper().find('FROM', select_start)
+            
+            if select_start != -1 and from_start != -1:
+                #xtract the column definitions between SELECT and FROM
+                select_clause = ddl[select_start + 6:from_start].strip() #this returns just the "body" part, where there are transforms and :: etc.
+
+                #Split by comma (handling potential commas in functions)
+                columns = []
+                paren_depth = 0
+                current_col = []
+                
+                #If we just split by commas, LEFT(KEK,2) would be incorrectly split into LEFT(KEK and 2)
+                #At this point I understand this, but tomorrow i'll need AI again
+                for char in select_clause:
+                    if char == '(':
+                        paren_depth += 1
+                    elif char == ')':
+                        paren_depth -= 1
+                    elif char == ',' and paren_depth == 0:
+                        columns.append(''.join(current_col).strip())
+                        current_col = []
+                        continue
+                    current_col.append(char)
+                
+                #Add the last column
+                if current_col:
+                    columns.append(''.join(current_col).strip())
+                
+                #Parse columns with transformations into different variables to be able to re-use them.
+                results = []
+                for col in columns:
+                    col_upper = col.upper()
+                    if ' AS ' in col_upper and '::' in col:
+                        # Find the AS keyword position
+                        as_pos = col_upper.rfind(' AS ')
+                        alias = col[as_pos + 4:].strip()
+                        
+                        #Everything before AS
+                        before_as = col[:as_pos].strip()
+                        
+                        #Find the :: to split transformation and type
+                        type_pos = before_as.rfind('::')
+                        transformation = before_as[:type_pos].strip()
+                        data_type = before_as[type_pos + 2:].strip()
+                        
+                        results.append({
+                            'alias': alias,
+                            'type': data_type,
+                            'transformation': transformation
+                        })
+                
+                return results
+            
+            return []
+        
 
 # Factory function to get the provider
 def get_data_provider():
