@@ -1,6 +1,5 @@
 import streamlit as st
 from github import Github
-import base64
 
 def push_to_github(file_path, file_content, commit_message):
     try:
