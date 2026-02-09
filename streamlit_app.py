@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 from utils.snowflake_connector import get_session
 from utils.data_provider import get_data_provider
-from components.builders_ui import create_object
-from components.builders_ui import modify_object
+from components.builders_ui import create_object, modify_object
 from components.home_ui import home
 
 
