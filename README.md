@@ -84,10 +84,9 @@ schema = "YOUR_SCHEMA"
 ## Future Roadmap
 
 - [X] **Column Transformations:** The option to implement column level transformation (e.g., `LEFT()`).
-- [ ] **Join objects:** The opportunity to use join with other objects.
+- [X] **Join objects:** The opportunity to use join with other objects.
 - [X] **Modify Existing Objects:** Load an existing table/view and apply changes.
 - [X] **GIT integration:** Implement a version control system.
-- [ ] **Orchestration Objects:** UI support for creating `Tasks` and `Streams`.
 
 ---
 
