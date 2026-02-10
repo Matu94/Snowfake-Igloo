@@ -274,6 +274,20 @@ def modify_object():
             else:
                 joins = []
 
+    #EDITORS:
+    st.subheader(f"Design {obj_type} Columns")
+    
+    final_ddl = None # Initialize variable
+
+    if obj_type == 'Table':
+        final_ddl = modify_table(selected_schema, object_name)
+
+    if obj_type == 'View':
+        final_ddl = modify_view(selected_schema, object_name, source_tables, joins)
+
+    if obj_type == 'Dynamic Table':
+        final_ddl = modify_dynamic_table(selected_schema, object_name, source_tables, joins)
+
 
 
     
