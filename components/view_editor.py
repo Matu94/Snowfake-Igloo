@@ -13,27 +13,34 @@ provider = get_data_provider()
 
 
 
-def create_view(editor_source_schema,editor_source_table,target_schema,target_name):
-    
+def create_view(source_tables, joins, target_schema, target_name):
+     
     #1. Create dynamic col_type options (both standard and already existing)
     #need this because i gave the coice to select the base types, but already existing can have more precies ones like NUMBER(38,0)
     #Fetch ALL columns at once
     rows_list = []
-    source_cols = provider.get_columns(editor_source_schema, editor_source_table, 'View')
-    #Build the rows from source 
-    #rows_list is a list, and the result of get_columns is also a list with 2 stuffs in it. first is the column name, second is the type. So with this for loop i can build the required list
-    for col_name, col_type, nullable in source_cols:
-        rows_list.append({
-            "src_col_nm": col_name,
-            "new_col_nm": col_name,
-            "transformation": "",
-            "data_type": col_type #This can be 'NUMBER(38,0)', wich is not part of the base types
-        })
 
-        #Add this specific/more precise type to list if it's not there
-        if col_type not in sf_types:
-            sf_types.append(col_type)
+    # Iterate through all source tables
+    for tbl in source_tables:
+        schema = tbl['schema']
+        table = tbl['table']
+        alias = tbl['alias']
+        
+        # We assume source is a Table for now, based on builders_ui.py behavior
+        # In a generic implementation we might need to know if it's a View
+        source_cols = provider.get_columns(schema, table, 'Table') 
+        
+        for col_name, col_type, nullable in source_cols:
+            rows_list.append({
+                "src_col_nm": f"{alias}.{col_name}", # Display with Alias
+                "new_col_nm": col_name,
+                "transformation": "",
+                "data_type": col_type 
+            })
 
+            #Add this specific/more precise type to list if it's not there
+            if col_type not in sf_types:
+                sf_types.append(col_type)
 
     #2. Create the DataFrame based on existing and base objects
     default_data = pd.DataFrame(rows_list)  
@@ -68,16 +75,31 @@ def create_view(editor_source_schema,editor_source_table,target_schema,target_na
             
             rule = row['transformation'] if row['transformation'] else row['src_col_nm']    #Check that we have rule or not. if not, use the original column name
 
-            if rule != row["new_col_nm"]:  #If we have rule that means we need to build the string in a different way, we need alias anyways with this method
+            # If user explicitly wrote a transformation rule, trust them. 
+            # If not, use the src_col_nm which now includes the alias (e.g. "T1.ID")
+            
+            if rule != row["new_col_nm"]:  
                 col_str = f"{rule}::{row['data_type']} AS {row['new_col_nm']}"
             else:
                 col_str = f"{row['src_col_nm']}::{row['data_type']}"
             col_definitions.append(col_str) 
             col_names_only.append(row["new_col_nm"])   
-    cols_sql = ",\n\t".join(col_definitions)          #Result: "ID NUMBER, NAME VARCHAR"
-    cols_names_str = ",\n\t".join(col_names_only)      #Result: "ID, NAME"  
+    cols_sql = ",\n\t".join(col_definitions)          
+    cols_names_str = ",\n\t".join(col_names_only)       
 
-
+    # Construct the FROM clause
+    # source_tables[0] is the base
+    base_tbl = source_tables[0]
+    from_clause = f"{base_tbl['schema']}.{base_tbl['table']} {base_tbl['alias']}"
+    
+    # Append joins
+    for join in joins:
+        # join = {'join_type': 'LEFT JOIN', 'right_alias': 'T2', 'on_condition': 'T1.ID = T2.ID'}
+        # We need to find the right table definition to get schema/table name from alias
+        right_tbl_def = next((t for t in source_tables if t['alias'] == join['right_alias']), None)
+        
+        if right_tbl_def:
+            from_clause += f"\n{join['join_type']} {right_tbl_def['schema']}.{right_tbl_def['table']} {right_tbl_def['alias']} ON {join['on_condition']}"
 
     #5. Object display  
     result = View(
@@ -85,7 +107,8 @@ def create_view(editor_source_schema,editor_source_table,target_schema,target_na
         name = target_name, 
         columns=cols_sql,
         col_names=cols_names_str,
-        source_object = f"{editor_source_schema}.{editor_source_table}")
+        source_object = from_clause) # Pass the full FROM/JOIN clause as source_object
+    
     
     
     return result.create_ddl()

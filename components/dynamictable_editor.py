@@ -12,26 +12,33 @@ provider = get_data_provider()
 
 
 
-def create_dynamic_table(editor_source_schema,editor_source_table,target_schema,target_name,warehouse,target_lag):
+def create_dynamic_table(source_tables, joins, target_schema, target_name, warehouse, target_lag):
     
     #1. Create dynamic col_type options (both standard and already existing)
     #need this because i gave the coice to select the base types, but already existing can have more precies ones like NUMBER(38,0)
     #Fetch ALL columns at once
     rows_list = []
-    source_cols = provider.get_columns(editor_source_schema, editor_source_table, 'Dynamic Table')
-    #Build the rows from source 
-    #rows_list is a list, and the result of get_columns is also a list with 2 stuffs in it. first is the column name, second is the type. So with this for loop i can build the required list
-    for col_name, col_type, nullable in source_cols:
-        rows_list.append({
-            "src_col_nm": col_name,
-            "new_col_nm": col_name,
-            "transformation": "",
-            "data_type": col_type #This can be 'NUMBER(38,0)', wich is not part of the base types
-        })
+        
+    # Iterate through all source tables
+    for tbl in source_tables:
+        schema = tbl['schema']
+        table = tbl['table']
+        alias = tbl['alias']
+        
+        # We assume source is a Table for now
+        source_cols = provider.get_columns(schema, table, 'Dynamic Table') 
+        
+        for col_name, col_type, nullable in source_cols:
+            rows_list.append({
+                "src_col_nm": f"{alias}.{col_name}",
+                "new_col_nm": col_name,
+                "transformation": "",
+                "data_type": col_type 
+            })
 
-        #Add this specific/more precise type to list if it's not there
-        if col_type not in sf_types:
-            sf_types.append(col_type)
+            #Add this specific/more precise type to list if it's not there
+            if col_type not in sf_types:
+                sf_types.append(col_type)
 
     
     #2. Create the DataFrame based on existing and base objects
@@ -79,12 +86,22 @@ def create_dynamic_table(editor_source_schema,editor_source_table,target_schema,
 
 
     #5. Object display  
+    # Construct the FROM clause
+    base_tbl = source_tables[0]
+    from_clause = f"{base_tbl['schema']}.{base_tbl['table']} {base_tbl['alias']}"
+    
+    # Append joins
+    for join in joins:
+        right_tbl_def = next((t for t in source_tables if t['alias'] == join['right_alias']), None)
+        if right_tbl_def:
+            from_clause += f"\n{join['join_type']} {right_tbl_def['schema']}.{right_tbl_def['table']} {right_tbl_def['alias']} ON {join['on_condition']}"
+
     result = DynamicTable(
         schema = target_schema, 
         name = target_name, 
         columns=cols_sql,
         col_names=cols_names_str,
-        source_object=f"{editor_source_schema}.{editor_source_table}",
+        source_object=from_clause,
         warehouse=warehouse,
         target_lag=target_lag)
     

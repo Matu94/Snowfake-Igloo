@@ -39,14 +39,65 @@ def create_object():
         with st.container(border=True):
             st.markdown("#### 2. Source Data")
             
-            c1, c2 = st.columns(2)
-            with c1:
-                editor_source_schema = st.selectbox("Target Source Schema", provider.get_schemas(database), key="src_schema")
-            with c2:
-                # We fetch tables based on the schema selected above
-                editor_source_table = st.selectbox("Target Source Table", provider.get_tables(editor_source_schema), key="src_table")
+            if "builder_source_tables" not in st.session_state:
+                st.session_state.builder_source_tables = []
             
-            st.caption(f"Selecting columns from: **{editor_source_schema}.{editor_source_table}**")
+            # Add Source Table UI
+            c1, c2, c3, c4 = st.columns([3, 3, 2, 2])
+            with c1:
+                src_schema = st.selectbox("Source Schema", provider.get_schemas(database), key="new_src_schema")
+            with c2:
+                src_table = st.selectbox("Source Table", provider.get_tables(src_schema), key="new_src_table")
+            with c3:
+                # Default alias: T + count
+                next_alias = f"T{len(st.session_state.builder_source_tables) + 1}"
+                src_alias = st.text_input("Alias", value=next_alias, key="new_src_alias")
+            with c4:
+                st.write("") # Spacer
+                if st.button("Add Source"):
+                    # Check duplication
+                    if not any(t['alias'] == src_alias for t in st.session_state.builder_source_tables):
+                        st.session_state.builder_source_tables.append({
+                            'schema': src_schema, 
+                            'table': src_table, 
+                            'alias': src_alias
+                        })
+                    else:
+                        st.error("Alias must be unique")
+
+            # Display Selected Sources
+            if st.session_state.builder_source_tables:
+                st.markdown("**Selected Sources:**")
+                st.dataframe(pd.DataFrame(st.session_state.builder_source_tables))
+                
+                if st.button("Clear Sources"):
+                     st.session_state.builder_source_tables = []
+            
+            source_tables = st.session_state.builder_source_tables
+
+            # Joins Configuration
+            if len(source_tables) > 1:
+                st.markdown("#### Joins")
+                join_types = ["LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL OUTER JOIN"]
+                available_aliases = [t['alias'] for t in source_tables]
+                
+                # Initial Data
+                join_df = pd.DataFrame(columns=["join_type", "right_alias", "on_condition"])
+
+                join_editor = st.data_editor(
+                    join_df,
+                    num_rows="dynamic",
+                    column_config={
+                        "join_type": st.column_config.SelectboxColumn("Type", options=join_types, required=True),
+                        "right_alias": st.column_config.SelectboxColumn("Right Table", options=available_aliases, required=True),
+                        "on_condition": st.column_config.TextColumn("ON Condition", required=True, width="large")
+                    },
+                    key="join_editor"
+                )
+                
+                joins = join_editor.to_dict('records')
+            
+            
 
 
     #ADVANCED SETTINGS
@@ -74,10 +125,16 @@ def create_object():
         final_ddl = create_table(target_schema, target_name)
 
     elif obj_type == 'View':
-        final_ddl = create_view(editor_source_schema, editor_source_table, target_schema, target_name)
+        if source_tables:
+            final_ddl = create_view(source_tables, joins, target_schema, target_name)
+        else:
+             st.info("Please select source tables.")
 
     elif obj_type == 'Dynamic Table':
-        final_ddl = create_dynamic_table(editor_source_schema, editor_source_table, target_schema, target_name, warehouse, target_lag)
+        if source_tables:
+            final_ddl = create_dynamic_table(source_tables, joins, target_schema, target_name, warehouse, target_lag)
+        else:
+             st.info("Please select source tables.")
 
 
 
