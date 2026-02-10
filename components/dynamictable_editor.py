@@ -108,27 +108,64 @@ def create_dynamic_table(source_tables, joins, target_schema, target_name, wareh
     
     return result.create_ddl()
 
-def modify_dynamic_table(selected_schema,selected_object_name):
+def modify_dynamic_table(selected_schema, selected_object_name, source_tables, joins):
     
-    #1. Create dynamic col_type options (both standard and already existing)
-    #need this because i gave the coice to select the base types, but already existing can have more precies ones like NUMBER(38,0)
-    #Fetch ALL columns at once
+    # 1. Create dynamic col_type options
     rows_list = []
-    source_cols = provider.get_columns(selected_schema, selected_object_name, 'Dynamic Table')
-    
     #Build the rows from source 
     #rows_list is a list, and the result of get_columns is also a list with 2 stuffs in it. first is the column name, second is the type. So with this for loop i can build the required list
-    for col_name, col_type, nullable in source_cols:
-        rows_list.append({
-            "src_col_nm": col_name,
-            "new_col_nm": col_name,
-            "transformation": provider.get_transform_by_alias(selected_schema,selected_object_name,'Dynamic Table',col_name),
-            "data_type": col_type #This can be 'NUMBER(38,0)', wich is not part of the base types
-        })
+    if not source_tables:
+        source_cols_from_dt = provider.get_columns(selected_schema, selected_object_name, 'Dynamic Table')
+        for col_name, col_type, nullable in source_cols_from_dt:
+             rows_list.append({
+                "src_col_nm": col_name,
+                "new_col_nm": col_name,
+                "transformation": provider.get_transform_by_alias(selected_schema,selected_object_name,'Dynamic Table',col_name),
+                "data_type": col_type   #can be number(38,0)
+            })
     
         #Add this specific/more precise type to list if it's not there
-        if col_type not in sf_types:
-            sf_types.append(col_type)
+             if col_type not in sf_types:
+                sf_types.append(col_type)
+    else:
+        # Source-Driven Logic
+        current_dt_defs = provider.get_transform(selected_schema, selected_object_name, 'Dynamic Table')
+        
+        src_to_target = {}
+        for cdd in current_dt_defs:
+            clean_transform = cdd['transformation'].strip()
+            src_to_target[clean_transform] = cdd
+            
+        for tbl in source_tables:
+            schema = tbl['schema']
+            table = tbl['table']
+            alias = tbl['alias']
+            
+            source_cols = provider.get_columns(schema, table, 'Table') # Assuming sources are tables
+            
+            for col_name, col_type, nullable in source_cols:
+                src_col_full = f"{alias}.{col_name}"
+                
+                match = src_to_target.get(src_col_full)
+                
+                if match:
+                    new_name = match['alias']
+                    transform = "" 
+                    d_type = match['type']
+                else:
+                    new_name = col_name 
+                    transform = "" 
+                    d_type = col_type
+
+                rows_list.append({
+                    "src_col_nm": src_col_full,
+                    "new_col_nm": new_name,
+                    "transformation": transform,
+                    "data_type": d_type 
+                })
+
+                if d_type not in sf_types:
+                    sf_types.append(d_type)
     
     
     #2. Create the DataFrame based on existing and base objects
@@ -170,12 +207,24 @@ def modify_dynamic_table(selected_schema,selected_object_name):
                 col_str = f"{row['src_col_nm']}::{row['data_type']}"
             col_definitions.append(col_str) 
             col_names_only.append(row["new_col_nm"])   
-    cols_sql = ",\n\t".join(col_definitions)          #Result: "ID NUMBER, NAME VARCHAR"
-    cols_names_str = ",\n\t".join(col_names_only)      #Result: "ID, NAME"  
+    cols_sql = ",\n\t".join(col_definitions)          
+    cols_names_str = ",\n\t".join(col_names_only)       #Result: "ID, NAME"  
 
-    #the function returns both, but if i only need one, i can use _ so that will be ignored, like: schemaname, _ = fun()
-    source_schema_name, source_obj_name = provider.get_source(selected_schema,selected_object_name,'Dynamic Table')
-    source_object = f"{source_schema_name}.{source_obj_name}"
+    # Construct source object from passed sources
+    source_object = ""
+    if source_tables:
+        base_tbl = source_tables[0]
+        from_clause = f"{base_tbl['schema']}.{base_tbl['table']} {base_tbl['alias']}"
+        
+        for join in joins:
+            right_tbl_def = next((t for t in source_tables if t['alias'] == join['right_alias']), None)
+            if right_tbl_def:
+                from_clause += f"\n{join['join_type']} {right_tbl_def['schema']}.{right_tbl_def['table']} {right_tbl_def['alias']} ON {join['on_condition']}"
+        source_object = from_clause
+    else:
+        source_schema_name, source_obj_name = provider.get_source(selected_schema,selected_object_name,'Dynamic Table')
+        source_object = f"{source_schema_name}.{source_obj_name}"
+        
     warehouse, target_lag = provider.get_dynamic_table_config(selected_schema,selected_object_name)
 
     #5. Object display  

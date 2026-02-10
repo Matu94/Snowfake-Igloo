@@ -115,26 +115,113 @@ def create_view(source_tables, joins, target_schema, target_name):
 
 
 
-def modify_view(selected_schema,selected_object_name):
+def modify_view(selected_schema, selected_object_name, source_tables, joins):
     
     #1. Create dynamic col_type options (both standard and already existing)
     #need this because i gave the coice to select the base types, but already existing can have more precies ones like NUMBER(38,0)
     #Fetch ALL columns at once
     rows_list = []
-    source_cols = provider.get_columns(selected_schema, selected_object_name, 'View')
-    #Build the rows from source 
-    #rows_list is a list, and the result of get_columns is also a list with 2 stuffs in it. first is the column name, second is the type. So with this for loop i can build the required list
-    for col_name, col_type, nullable in source_cols:
-        rows_list.append({
-            "src_col_nm": col_name,
-            "new_col_nm": col_name,
-            "transformation": provider.get_transform_by_alias(selected_schema,selected_object_name,'View',col_name),
-            "data_type": col_type #This can be 'NUMBER(38,0)', wich is not part of the base types
-        })
+    
+    # We want to show ALL source columns (Source-Driven) 
+    # BUT we want to pre-fill with existing transformations if they exist.
+    
+    # If source_tables is empty (e.g. initial load failed or cleared), maybe fallback to old behavior?
+    # But builders_ui tries to populate it.
+    
+    if not source_tables:
+        # Fallback to old simple mode if no sources defined (shouldn't happen if parsing works)
+        # Or just show empty and let user add sources
+        source_cols_from_view = provider.get_columns(selected_schema, selected_object_name, 'View')
+        for col_name, col_type, nullable in source_cols_from_view:
+             rows_list.append({
+                "src_col_nm": col_name,
+                "new_col_nm": col_name,
+                "transformation": provider.get_transform_by_alias(selected_schema,selected_object_name,'View',col_name),
+                "data_type": col_type #This can be 'NUMBER(38,0)', wich is not part of the base types
+            })
 
         #Add this specific/more precise type to list if it's not there
-        if col_type not in sf_types:
-            sf_types.append(col_type)
+             if col_type not in sf_types:
+                sf_types.append(col_type)
+    else:
+        # Source-Driven Logic
+        # 1. Get all potential source columns
+        # 2. Get existing view columns + transformations
+        
+        # Get existing transformations map: alias -> {transformation, type}
+        existing_transforms = provider.get_transform(selected_schema, selected_object_name, 'View')
+        # Convert to a dict for easy lookup by Alias (new_col_nm)
+        # But wait, we need to map Source Column -> Target Column.
+        # Use simple name matching? 
+        # If DDL is "SELECT T1.ID AS USER_ID ...", we have "USER_ID" and transform "T1.ID".
+        # We need to find the row where src_col_nm is "T1.ID" and set new_col_nm to "USER_ID".
+        
+        # Let's build a map of Source Expression -> Target Details
+        # existing_transform_map = { tf['transformation'].upper(): tf for tf in existing_transforms } 
+        # This is hard because transformation can be anything.
+        
+        # Simpler approach for version 1:
+        # List all source columns.
+        # If a source column matches an existing target column NAME (and isn't transformed), pre-fill it.
+        # If the view has complex transformations, we might miss them if we only iterate source columns.
+        
+        # Better approach:
+        # 1. Iterate all source columns.
+        # 2. Check if this source column is used in the existing view logic? Hard to parse.
+        
+        # Let's stick to the Plan: List all source columns.
+        # For each source column, check if it exists in the view output (by name matching if simple, or by checking the definition).
+        
+        # Actually, let's just LIST all source columns as available. 
+        # If the user already defined the view, we try to match by Column Name? 
+        # No, "modify" means "re-define". 
+        # IF we want to preserve existing work, we must check if "T1.ID" was mapped to "ID" or "USER_ID".
+        # `get_transform` gives us the list of output columns and their source expressions.
+        
+        current_view_defs = provider.get_transform(selected_schema, selected_object_name, 'View')
+        # current_view_defs = [{'alias': 'ID', 'type': 'NUMBER', 'transformation': 'T1.ID'}, ...]
+        
+        # Create a lookup: Source Expression -> Target Alias
+        # Because we iterate over Source Columns (e.g. T1.ID), we check if 'T1.ID' is used as a transformation source.
+        src_to_target = {}
+        for cvd in current_view_defs:
+            # Transformation is currently just the string before ::TYPE
+            # e.g. "T1.ID" or "LEFT(T1.NAME, 2)"
+            clean_transform = cvd['transformation'].strip()
+            src_to_target[clean_transform] = cvd
+            
+        for tbl in source_tables:
+            schema = tbl['schema']
+            table = tbl['table']
+            alias = tbl['alias']
+            
+            source_cols = provider.get_columns(schema, table, 'Table') 
+            
+            for col_name, col_type, nullable in source_cols:
+                src_col_full = f"{alias}.{col_name}"
+                
+                # Check if this exact column is used as a source
+                match = src_to_target.get(src_col_full)
+                
+                if match:
+                    new_name = match['alias']
+                    transform = "" # It's a direct map
+                    d_type = match['type']
+                else:
+                    # New or unused column
+                    new_name = col_name 
+                    transform = "" # Default to empty
+                    d_type = col_type
+
+                rows_list.append({
+                    "src_col_nm": src_col_full,
+                    "new_col_nm": new_name,
+                    "transformation": transform,
+                    "data_type": d_type 
+                })
+
+                if d_type not in sf_types:
+                    sf_types.append(d_type)
 
     
     #2. Create the DataFrame based on existing and base objects
@@ -176,12 +263,24 @@ def modify_view(selected_schema,selected_object_name):
                 col_str = f"{row['src_col_nm']}::{row['data_type']}"
             col_definitions.append(col_str) 
             col_names_only.append(row["new_col_nm"])   
-    cols_sql = ",\n\t".join(col_definitions)          #Result: "ID NUMBER, NAME VARCHAR"
-    cols_names_str = ",\n\t".join(col_names_only)      #Result: "ID, NAME"  
+    cols_sql = ",\n\t".join(col_definitions)          
+    cols_names_str = ",\n\t".join(col_names_only)      
 
-    #the function returns both, but if i only need one, i can use _ so that will be ignored, like: schemaname, _ = fun()
-    source_schema_name, source_obj_name = provider.get_source(selected_schema,selected_object_name,'View')
-    source_object = f"{source_schema_name}.{source_obj_name}"
+    # Construct the FROM clause from the PASSED source_tables and joins (Edited version)
+    source_object = ""
+    if source_tables:
+        base_tbl = source_tables[0]
+        from_clause = f"{base_tbl['schema']}.{base_tbl['table']} {base_tbl['alias']}"
+        
+        for join in joins:
+            right_tbl_def = next((t for t in source_tables if t['alias'] == join['right_alias']), None)
+            if right_tbl_def:
+                from_clause += f"\n{join['join_type']} {right_tbl_def['schema']}.{right_tbl_def['table']} {right_tbl_def['alias']} ON {join['on_condition']}"
+        source_object = from_clause
+    else:
+        # Fallback if no sources passed? 
+        source_schema_name, source_obj_name = provider.get_source(selected_schema,selected_object_name,'View')
+        source_object = f"{source_schema_name}.{source_obj_name}"
 
 
     #5. Object display  
