@@ -79,7 +79,8 @@ def create_object():
             if len(source_tables) > 1:
                 st.markdown("#### Joins")
                 join_types = ["LEFT JOIN", "INNER JOIN", "RIGHT JOIN", "FULL OUTER JOIN"]
-                available_aliases = [t['alias'] for t in source_tables]
+                # available_aliases should exclude the first table (base table) to avoid self-joins on the same alias
+                available_aliases = [t['alias'] for t in source_tables if t['alias'] != source_tables[0]['alias']]
                 
                 # Initial Data
                 join_df = pd.DataFrame(columns=["join_type", "right_alias", "on_condition"])
