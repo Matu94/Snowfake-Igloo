@@ -32,7 +32,8 @@ def create_object():
         with c3:
             target_name = st.text_input("Object Name", placeholder="e.g. CLEAN_USERS_T")
 
-
+    source_tables = []
+    joins = []
     #SOURCE CONFIGURATION 
     if obj_type in ("Dynamic Table", "View"):
         with st.container(border=True):
